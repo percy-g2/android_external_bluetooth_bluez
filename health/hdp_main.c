@@ -31,6 +31,7 @@
 
 #include <gdbus.h>
 
+#include "log.h"
 #include "plugin.h"
 #include "hdp_manager.h"
 

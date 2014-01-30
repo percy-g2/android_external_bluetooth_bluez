@@ -28,7 +28,20 @@ extern "C" {
 
 typedef void* a2dpData;
 
-int a2dp_init(int rate, int channels, a2dpData* dataPtr);
+#ifdef SUPPORT_A2DP_1_3
+/**
+ * @brief Callback function for reporting changed sink delay.
+ * @user_data:	Arbitrary data used when registering callback.
+ * @sink_delay:	New sink delay in 1/10 milliseconds.
+ */
+typedef void (*report_sink_delay)(void *user_data, unsigned int sink_delay);
+#endif
+
+int a2dp_init(int rate, int channels, a2dpData* dataPtr
+#ifdef SUPPORT_A2DP_1_3
+		, report_sink_delay sink_delay_cb, void *user_data
+#endif
+		);
 void a2dp_set_sink(a2dpData data, const char* address);
 int a2dp_write(a2dpData data, const void* buffer, int count);
 int a2dp_stop(a2dpData data);

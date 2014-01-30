@@ -34,6 +34,7 @@
 #include <bluetooth/bluetooth.h>
 #include <bluetooth/uuid.h>
 
+#include "glib-compat.h"
 #include "adapter.h"
 #include "device.h"
 #include "log.h"
@@ -1057,7 +1058,7 @@ GSList *attrib_client_register(DBusConnection *connection,
 	bdaddr_t sba, dba;
 
 	adapter_get_address(adapter, &sba);
-	device_get_address(device, &dba);
+	device_get_address(device, &dba, NULL);
 
 	gatt = g_new0(struct gatt_service, 1);
 	gatt->dev = btd_device_ref(device);

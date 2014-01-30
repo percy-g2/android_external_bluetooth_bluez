@@ -8,6 +8,8 @@ LOCAL_SRC_FILES:= \
 	a2dp.c \
 	avdtp.c \
 	control.c \
+	avctp.c \
+	avrcp.c \
 	device.c \
 	gateway.c \
 	headset.c \
@@ -20,14 +22,21 @@ LOCAL_SRC_FILES:= \
 	source.c \
 	telephony-dummy.c \
 	transport.c \
-	unix.c
+	unix.c \
+	ste-qos.c
 
 LOCAL_CFLAGS:= \
 	-DVERSION=\"4.93\" \
 	-DSTORAGEDIR=\"/data/misc/bluetoothd\" \
 	-DCONFIGDIR=\"/etc/bluetooth\" \
 	-DANDROID \
-	-D__S_IFREG=0100000  # missing from bionic stat.h
+	-DNEED_G_SLIST_FREE_FULL \
+	-Wno-missing-field-initializers \
+	-Wno-pointer-arith \
+	-DDEBUG_SECTION=\"_audio\" \
+	-D__S_IFREG=0100000 # missing from bionic stat.h
+
+LOCAL_CFLAGS+= -DSUPPORT_A2DP_1_3
 
 LOCAL_C_INCLUDES:= \
 	$(LOCAL_PATH)/../lib \
@@ -76,6 +85,8 @@ endif
 
 # to improve SBC performance
 LOCAL_CFLAGS:= -funroll-loops
+
+LOCAL_CFLAGS+= -DSUPPORT_A2DP_1_3
 
 LOCAL_C_INCLUDES:= \
 	$(LOCAL_PATH)/../sbc \

@@ -45,6 +45,7 @@
 #include "headset.h"
 #include "manager.h"
 #include "gateway.h"
+#include "ste-qos.h"
 
 static GIOChannel *sco_server = NULL;
 
@@ -164,6 +165,8 @@ static int audio_init(void)
 		goto failed;
 	}
 
+	ste_qos_init();
+
 	return 0;
 
 failed:
@@ -184,6 +187,8 @@ static void audio_exit(void)
 		g_io_channel_unref(sco_server);
 		sco_server = NULL;
 	}
+
+	ste_qos_exit();
 
 	audio_manager_exit();
 

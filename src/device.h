@@ -35,19 +35,11 @@ typedef enum {
 	AUTH_TYPE_PAIRING_CONSENT,
 } auth_type_t;
 
-typedef enum {
-	DEVICE_TYPE_UNKNOWN,
-	DEVICE_TYPE_BREDR,
-	DEVICE_TYPE_LE,
-	DEVICE_TYPE_DUALMODE
-} device_type_t;
-
 struct btd_device *device_create(DBusConnection *conn,
-				struct btd_adapter *adapter,
-				const gchar *address, device_type_t type);
+					struct btd_adapter *adapter,
+					const char *address, addr_type_t type);
 void device_set_name(struct btd_device *device, const char *name);
 void device_get_name(struct btd_device *device, char *name, size_t len);
-device_type_t device_get_type(struct btd_device *device);
 void device_remove(struct btd_device *device, gboolean remove_stored);
 gint device_address_cmp(struct btd_device *device, const gchar *address);
 int device_browse_primary(struct btd_device *device, DBusConnection *conn,
@@ -64,16 +56,20 @@ GSList *device_services_from_record(struct btd_device *device,
 							GSList *profiles);
 void btd_device_add_uuid(struct btd_device *device, const char *uuid);
 struct btd_adapter *device_get_adapter(struct btd_device *device);
-void device_get_address(struct btd_device *device, bdaddr_t *bdaddr);
+void device_get_address(struct btd_device *device, bdaddr_t *bdaddr,
+							addr_type_t *type);
 const gchar *device_get_path(struct btd_device *device);
 struct agent *device_get_agent(struct btd_device *device);
+gboolean device_is_bredr(struct btd_device *device);
+gboolean device_is_le(struct btd_device *device);
 gboolean device_is_busy(struct btd_device *device);
 gboolean device_is_temporary(struct btd_device *device);
 gboolean device_is_paired(struct btd_device *device);
+gboolean device_is_bonded(struct btd_device *device);
 gboolean device_is_trusted(struct btd_device *device);
 void device_set_paired(struct btd_device *device, gboolean paired);
 void device_set_temporary(struct btd_device *device, gboolean temporary);
-void device_set_type(struct btd_device *device, device_type_t type);
+void device_set_type(struct btd_device *device,addr_type_t type);
 void device_set_bonded(struct btd_device *device, gboolean bonded);
 gboolean device_is_connected(struct btd_device *device);
 DBusMessage *device_create_bonding(struct btd_device *device,
@@ -103,6 +99,9 @@ guint device_add_disconnect_watch(struct btd_device *device,
 				GDestroyNotify destroy);
 void device_remove_disconnect_watch(struct btd_device *device, guint id);
 void device_set_class(struct btd_device *device, uint32_t value);
+void device_set_qos(struct btd_device *device, struct ste_qos_params *params);
+void device_set_features(struct btd_device *device, uint8_t *features);
+uint8_t *device_get_features(struct btd_device *device);
 
 #define BTD_UUIDS(args...) ((const char *[]) { args, NULL } )
 

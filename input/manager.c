@@ -69,10 +69,10 @@ static int hid_device_probe(struct btd_device *device, GSList *uuids)
 		return -1;
 
 	adapter_get_address(adapter, &src);
-	device_get_address(device, &dst);
+	device_get_address(device, &dst, NULL);
 
 	return input_device_register(connection, device, path, &src, &dst,
-				HID_UUID, rec->handle, idle_timeout * 60);
+				HID_UUID, rec, idle_timeout * 60);
 }
 
 static void hid_device_remove(struct btd_device *device)
@@ -112,7 +112,7 @@ static int headset_probe(struct btd_device *device, GSList *uuids)
 	}
 
 	adapter_get_address(adapter, &src);
-	device_get_address(device, &dst);
+	device_get_address(device, &dst, NULL);
 
 	return fake_input_register(connection, device, path, &src, &dst,
 				HSP_HS_UUID, ch);

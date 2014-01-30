@@ -37,6 +37,13 @@ struct btd_debug_desc {
 	unsigned int flags;
 } __attribute__((aligned(8)));
 
+void __btd_enable_debug(struct btd_debug_desc *start,
+					struct btd_debug_desc *stop);
+
+#ifndef DEBUG_SECTION
+#define DEBUG_SECTION
+#endif
+
 /**
  * DBG:
  * @fmt: format string
@@ -47,7 +54,7 @@ struct btd_debug_desc {
  */
 #define DBG(fmt, arg...) do { \
 	static struct btd_debug_desc __btd_debug_desc \
-	__attribute__((used, section("__debug"), aligned(8))) = { \
+	__attribute__((used, section("__debug"DEBUG_SECTION), aligned(8))) = { \
 		.file = __FILE__, .flags = BTD_DEBUG_FLAG_DEFAULT, \
 	}; \
 	if (__btd_debug_desc.flags & BTD_DEBUG_FLAG_PRINT) \

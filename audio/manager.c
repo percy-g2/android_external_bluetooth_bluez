@@ -64,6 +64,7 @@
 #include "gateway.h"
 #include "sink.h"
 #include "source.h"
+#include "avrcp.h"
 #include "control.h"
 #include "manager.h"
 #include "sdpd.h"
@@ -118,7 +119,7 @@ static struct enabled_interfaces enabled = {
 	.source		= FALSE,
 	.control	= TRUE,
 	.socket		= TRUE,
-	.media		= FALSE
+	.media		= FALSE,
 };
 
 static struct audio_adapter *find_adapter(GSList *list,
@@ -219,9 +220,10 @@ static void handle_uuid(const char *uuidstr, struct audio_device *device)
 		DBG("Found AV %s", uuid16 == AV_REMOTE_SVCLASS_ID ?
 							"Remote" : "Target");
 		if (device->control)
-			control_update(device, uuid16);
+			control_update(device->control, uuid16);
 		else
 			device->control = control_init(device, uuid16);
+
 		if (device->sink && sink_is_active(device))
 			avrcp_connect(device);
 		break;
@@ -775,7 +777,7 @@ static int audio_probe(struct btd_device *device, GSList *uuids)
 	struct audio_device *audio_dev;
 
 	adapter_get_address(adapter, &src);
-	device_get_address(device, &dst);
+	device_get_address(device, &dst, NULL);
 
 	audio_dev = manager_get_device(&src, &dst, TRUE);
 	if (!audio_dev) {
@@ -1170,6 +1172,7 @@ int audio_manager_init(DBusConnection *conn, GKeyFile *conf,
 			enabled.socket = TRUE;
 		else if (g_str_equal(list[i], "Media"))
 			enabled.media = TRUE;
+
 	}
 	g_strfreev(list);
 

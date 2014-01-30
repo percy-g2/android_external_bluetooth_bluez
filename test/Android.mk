@@ -9,7 +9,9 @@ BUILD_HCIEMU:=0
 include $(CLEAR_VARS)
 
 LOCAL_CFLAGS:= \
-	-DVERSION=\"4.93\"
+	-DVERSION=\"4.93\" \
+	-Wno-missing-field-initializers \
+	-Wno-pointer-arith
 
 LOCAL_SRC_FILES:= \
 	hstest.c
@@ -34,7 +36,9 @@ include $(BUILD_EXECUTABLE)
 include $(CLEAR_VARS)
 
 LOCAL_CFLAGS:= \
-	-DVERSION=\"4.93\"
+	-DVERSION=\"4.93\" \
+	-Wno-missing-field-initializers \
+	-Wno-pointer-arith
 
 LOCAL_SRC_FILES:= \
 	l2test.c
@@ -59,7 +63,9 @@ include $(BUILD_EXECUTABLE)
 include $(CLEAR_VARS)
 
 LOCAL_CFLAGS:= \
-	-DVERSION=\"4.93\"
+	-DVERSION=\"4.93\" \
+	-Wno-missing-field-initializers \
+	-Wno-pointer-arith
 
 LOCAL_SRC_FILES:= \
 	rctest.c
@@ -85,7 +91,9 @@ include $(BUILD_EXECUTABLE)
 include $(CLEAR_VARS)
 
 LOCAL_CFLAGS:= \
-	-DVERSION=\"4.93\"
+	-DVERSION=\"4.93\" \
+	-Wno-missing-field-initializers \
+	-Wno-pointer-arith
 
 LOCAL_SRC_FILES:= \
 	scotest.c
@@ -110,7 +118,9 @@ include $(BUILD_EXECUTABLE)
 include $(CLEAR_VARS)
 
 LOCAL_CFLAGS:= \
-	-DVERSION=\"4.93\"
+	-DVERSION=\"4.93\" \
+	-Wno-missing-field-initializers \
+	-Wno-pointer-arith
 
 LOCAL_SRC_FILES:= \
 	agent.c
@@ -136,7 +146,9 @@ include $(BUILD_EXECUTABLE)
 include $(CLEAR_VARS)
 
 LOCAL_CFLAGS:= \
-	-DVERSION=\"4.93\"
+	-DVERSION=\"4.93\" \
+	-Wno-missing-field-initializers \
+	-Wno-pointer-arith
 
 LOCAL_SRC_FILES:= \
 	attest.c
@@ -161,7 +173,9 @@ include $(BUILD_EXECUTABLE)
 include $(CLEAR_VARS)
 
 LOCAL_CFLAGS:= \
-	-DVERSION=\"4.93\"
+	-DVERSION=\"4.93\" \
+	-Wno-missing-field-initializers \
+	-Wno-pointer-arith
 
 LOCAL_SRC_FILES:= \
 	avtest.c
@@ -186,7 +200,9 @@ include $(BUILD_EXECUTABLE)
 include $(CLEAR_VARS)
 
 LOCAL_CFLAGS:= \
-	-DVERSION=\"4.93\"
+	-DVERSION=\"4.93\" \
+	-Wno-missing-field-initializers \
+	-Wno-pointer-arith
 
 LOCAL_SRC_FILES:= \
 	bdaddr.c
@@ -212,7 +228,9 @@ ifeq ($(BUILD_BTIOTEST),1)
 include $(CLEAR_VARS)
 
 LOCAL_CFLAGS:= \
-	-DVERSION=\"4.93\"
+	-DVERSION=\"4.93\" \
+	-Wno-missing-field-initializers \
+	-Wno-pointer-arith
 
 LOCAL_SRC_FILES:= \
 	btiotest.c
@@ -245,7 +263,9 @@ ifeq ($(BUILD_HCIEMU),1)
 include $(CLEAR_VARS)
 
 LOCAL_CFLAGS:= \
-	-DVERSION=\"4.93\"
+	-DVERSION=\"4.93\" \
+	-Wno-missing-field-initializers \
+	-Wno-pointer-arith
 
 LOCAL_SRC_FILES:= \
 	hciemu.c
@@ -279,7 +299,9 @@ endif #BUILD_HCIEMU
 include $(CLEAR_VARS)
 
 LOCAL_CFLAGS:= \
-	-DVERSION=\"4.93\"
+	-DVERSION=\"4.93\" \
+	-Wno-missing-field-initializers \
+	-Wno-pointer-arith
 
 LOCAL_SRC_FILES:= \
 	lmptest.c
@@ -304,7 +326,9 @@ include $(BUILD_EXECUTABLE)
 include $(CLEAR_VARS)
 
 LOCAL_CFLAGS:= \
-	-DVERSION=\"4.93\"
+	-DVERSION=\"4.93\" \
+	-Wno-missing-field-initializers \
+	-Wno-pointer-arith
 
 LOCAL_SRC_FILES:= \
 	sdptest.c
@@ -319,5 +343,23 @@ LOCAL_SHARED_LIBRARIES := \
 LOCAL_MODULE_PATH := $(TARGET_OUT_OPTIONAL_EXECUTABLES)
 LOCAL_MODULE_TAGS := eng
 LOCAL_MODULE:=sdptest
+
+include $(BUILD_EXECUTABLE)
+
+#
+# hidpts - simple tools for PTS testing
+#
+
+include $(CLEAR_VARS)
+
+LOCAL_SRC_FILES:= \
+        hidpts.c
+
+LOCAL_SHARED_LIBRARIES := \
+        libc
+
+LOCAL_MODULE_PATH := $(TARGET_OUT_OPTIONAL_EXECUTABLES)
+LOCAL_MODULE_TAGS := eng
+LOCAL_MODULE:=hidpts
 
 include $(BUILD_EXECUTABLE)

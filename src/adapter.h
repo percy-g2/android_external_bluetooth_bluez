@@ -54,7 +54,15 @@ typedef enum {
 	NAME_REQUESTED,    /* HCI remote name request was sent    */
 } name_status_t;
 
+typedef enum {
+	ADDR_TYPE_UNKNOWN,
+	ADDR_TYPE_BREDR,
+	ADDR_TYPE_LE_PUBLIC,
+	ADDR_TYPE_LE_RANDOM,
+} addr_type_t;
+
 struct btd_adapter;
+struct ste_qos_params;
 
 struct link_key_info {
 	bdaddr_t bdaddr;
@@ -65,13 +73,13 @@ struct link_key_info {
 
 struct remote_dev_info {
 	bdaddr_t bdaddr;
+	addr_type_t type;
 	int8_t rssi;
 	uint32_t class;
 	char *name;
 	char *alias;
 	dbus_bool_t legacy;
 	name_status_t name_status;
-	gboolean le;
 	char **uuids;
 	size_t uuid_count;
 	GSList *services;
@@ -108,9 +116,11 @@ int adapter_get_state(struct btd_adapter *adapter);
 int adapter_get_discover_type(struct btd_adapter *adapter);
 struct remote_dev_info *adapter_search_found_devices(struct btd_adapter *adapter,
 						struct remote_dev_info *match);
-void adapter_update_found_devices(struct btd_adapter *adapter, bdaddr_t *bdaddr,
-						uint32_t class, int8_t rssi,
-						uint8_t *data);
+void adapter_update_found_devices(struct btd_adapter *adapter,
+					bdaddr_t *bdaddr, addr_type_t type,
+					uint32_t class, int8_t rssi,
+					uint8_t confirm_name,
+					uint8_t *data, uint8_t data_len);
 int adapter_remove_found_device(struct btd_adapter *adapter, bdaddr_t *bdaddr);
 void adapter_emit_device_found(struct btd_adapter *adapter,
 						struct remote_dev_info *dev);
@@ -212,6 +222,9 @@ struct btd_adapter_ops {
 	int (*remove_remote_oob_data) (int index, bdaddr_t *bdaddr);
 	int (*set_link_timeout) (int index, bdaddr_t *bdaddr, uint32_t num_slots);
 	int (*retry_authentication) (int index, bdaddr_t *bdaddr);
+	int (*set_qos) (int index, bdaddr_t *bdaddr,
+						struct ste_qos_params *params);
+	int (*forbid_role_switch) (int index, bdaddr_t *bdaddr);
 };
 
 int btd_register_adapter_ops(struct btd_adapter_ops *ops, gboolean priority);
@@ -270,4 +283,10 @@ int btd_adapter_add_remote_oob_data(struct btd_adapter *adapter,
 			bdaddr_t *bdaddr, uint8_t *hash, uint8_t *randomizer);
 
 int btd_adapter_remove_remote_oob_data(struct btd_adapter *adapter,
+							bdaddr_t *bdaddr);
+
+int btd_adapter_set_qos(struct btd_adapter *adapter, bdaddr_t *bdaddr,
+						struct ste_qos_params *params);
+
+int btd_adapter_forbid_role_switch(struct btd_adapter *adapter,
 							bdaddr_t *bdaddr);

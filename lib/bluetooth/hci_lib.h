@@ -128,6 +128,7 @@ int hci_le_create_conn(int dd, uint16_t interval, uint16_t window,
 		uint16_t min_ce_length, uint16_t max_ce_length,
 		uint16_t *handle, int to);
 
+
 int hci_le_conn_update(int dd, uint16_t handle, uint16_t min_interval,
 			uint16_t max_interval, uint16_t latency,
 			uint16_t supervision_timeout, int to);
@@ -137,6 +138,14 @@ int hci_le_read_white_list_size(int dd, uint8_t *size, int to);
 int hci_le_clear_white_list(int dd, int to);
 int hci_for_each_dev(int flag, int(*func)(int dd, int dev_id, long arg), long arg);
 int hci_get_route(bdaddr_t *bdaddr);
+
+int hci_vs_ext_flow_spec(int dd, uint16_t handle, uint16_t service_interval,
+		uint16_t out_service_window, uint16_t in_service_window,
+		uint8_t cqae, uint16_t packet_size, uint8_t *rsp_status, int to);
+int hci_write_flow_spec(int dd, uint16_t handle, uint16_t token_bucket_size,
+		uint16_t access_latency, uint8_t direction,
+		uint8_t service_type, uint8_t flags, uint16_t token_rate,
+		uint16_t peak_bandwidth, uint8_t *rsp_status, int to);
 
 char *hci_bustostr(int bus);
 char *hci_typetostr(int type);

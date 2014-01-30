@@ -35,6 +35,7 @@
 #include <dbus/dbus.h>
 #include <gdbus.h>
 
+#include "glib-compat.h"
 #include "log.h"
 #include "telephony.h"
 

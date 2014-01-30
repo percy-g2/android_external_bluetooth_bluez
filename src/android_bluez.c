@@ -34,6 +34,8 @@
 #include <bluetooth/bluetooth.h>
 #include <bluetooth/hci.h>
 
+#include "log.h"
+
 /* Set UID to bluetooth w/ CAP_NET_RAW, CAP_NET_ADMIN and CAP_NET_BIND_SERVICE
  * (Android's init.rc does not yet support applying linux capabilities) */
 void android_set_aid_and_cap() {

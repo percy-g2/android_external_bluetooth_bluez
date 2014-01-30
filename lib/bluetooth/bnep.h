@@ -120,6 +120,7 @@ struct bnep_ext_hdr {
 #define BNEPCONNDEL	_IOW('B', 201, int)
 #define BNEPGETCONNLIST	_IOR('B', 210, int)
 #define BNEPGETCONNINFO	_IOR('B', 211, int)
+#define BNEPEXTENSION	_IOW('B', 212, int)
 
 struct bnep_connadd_req {
 	int      sock;		/* Connected socket */
@@ -144,6 +145,12 @@ struct bnep_conninfo {
 struct bnep_connlist_req {
 	uint32_t cnum;
 	struct bnep_conninfo *ci;
+};
+
+struct bnep_extension_req {
+	uint16_t data_len;
+	uint8_t  dst[ETH_ALEN];
+	uint8_t  ext_data[0];
 };
 
 #ifdef __cplusplus

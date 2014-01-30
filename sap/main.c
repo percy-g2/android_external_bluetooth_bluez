@@ -24,6 +24,7 @@
 
 #include <errno.h>
 #include <gdbus.h>
+#include "log.h"
 #include "plugin.h"
 #include "manager.h"
 

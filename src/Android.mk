@@ -16,6 +16,7 @@ LOCAL_SRC_FILES:= \
 	error.c \
 	event.c \
 	glib-helper.c \
+	sdp-client.c \
 	log.c \
 	main.c \
 	manager.c \
@@ -46,6 +47,8 @@ LOCAL_CFLAGS:= \
 	-DANDROID_SET_AID_AND_CAP \
 	-DANDROID_EXPAND_NAME \
 	-DOUIFILE=\"/data/misc/bluetoothd/ouifile\" \
+	-Wno-missing-field-initializers \
+	-Wno-pointer-arith
 
 ifeq ($(BOARD_HAVE_BLUETOOTH_BCM),true)
 LOCAL_CFLAGS += \

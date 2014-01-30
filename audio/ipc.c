@@ -40,9 +40,9 @@ static const char *strnames[] = {
 	"BT_NEW_STREAM",
 	"BT_START_STREAM",
 	"BT_STOP_STREAM",
-	"BT_SUSPEND_STREAM",
-	"BT_RESUME_STREAM",
+	"BT_CLOSE",
 	"BT_CONTROL",
+	"BT_DELAY_REPORT"
 };
 
 int bt_audio_service_open(void)

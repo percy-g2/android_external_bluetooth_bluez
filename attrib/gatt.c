@@ -29,6 +29,8 @@
 #include <bluetooth/sdp.h>
 #include <bluetooth/sdp_lib.h>
 
+#include "glib-compat.h"
+
 #include "att.h"
 #include "gattrib.h"
 #include "gatt.h"

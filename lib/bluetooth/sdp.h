@@ -148,6 +148,8 @@ extern "C" {
 #define HDP_SINK_SVCLASS_ID		0x1402
 #define APPLE_AGENT_SVCLASS_ID		0x2112
 #define GENERIC_ATTRIB_SVCLASS_ID	0x1801
+#define MAP_SVCLASS_ID			0x1134
+#define MAP_SERVER_SVCLASS_ID		0x1132
 
 /*
  * Standard profile descriptor identifiers; note these
@@ -222,6 +224,8 @@ extern "C" {
 #define APPLE_AGENT_PROFILE_ID		APPLE_AGENT_SVCLASS_ID
 #define GENERIC_ACCESS_PROFILE_ID	0x1800
 #define GENERIC_ATTRIB_PROFILE_ID	GENERIC_ATTRIB_SVCLASS_ID
+#define MESSAGE_ACCESS_PROFILE_ID		MAP_SVCLASS_ID
+#define MESSAGE_ACCESS_SERVER_PROFILE_ID	MAP_SERVER_SVCLASS_ID
 
 /*
  * Compatibility macros for the old MDP acronym
@@ -311,6 +315,8 @@ extern "C" {
 #define SDP_ATTR_HID_SUPERVISION_TIMEOUT	0x020c
 #define SDP_ATTR_HID_NORMALLY_CONNECTABLE	0x020d
 #define SDP_ATTR_HID_BOOT_DEVICE		0x020e
+#define SDP_ATTR_MAP_MASINSTANCE_ID		0x0315
+#define SDP_ATTR_MAP_SUPPORTED_MSG_TYPE		0x0316
 
 /*
  * These identifiers are based on the SDP spec stating that

@@ -709,6 +709,21 @@ typedef struct {
 #define OCF_WRITE_DEFAULT_LINK_POLICY	0x000F
 
 #define OCF_FLOW_SPECIFICATION		0x0010
+typedef struct {
+	uint8_t		direction;		/* 0 = outgoing flow */
+	uint8_t		service_type;		/* 2 = guaranteed */
+	uint32_t	token_rate;		/* Bytes per seconds */
+	uint32_t	token_bucket_size;	/* Bytes */
+	uint32_t	peak_bandwidth;		/* Byte per seconds */
+	uint32_t	access_latency;		/* Microseconds */
+} __attribute__ ((packed)) flow_spec;
+#define HCI_FLOW_SPEC_CP_SIZE 18
+typedef struct {
+	uint16_t	handle;
+	uint8_t		flags;			/* Reserved */
+	flow_spec	spec;
+} __attribute__ ((packed)) flow_spec_cp;
+#define FLOW_SPEC_CP_SIZE (3 + HCI_FLOW_SPEC_CP_SIZE)
 
 #define OCF_SNIFF_SUBRATING		0x0011
 typedef struct {
@@ -1691,6 +1706,24 @@ typedef struct {
 /* Vendor specific commands */
 #define OGF_VENDOR_CMD		0x3f
 
+#define OCF_VS_EXT_FLOW_SPEC		0x00D5
+typedef struct {
+	uint16_t	handle;
+	uint16_t	service_interval;
+	uint16_t	out_service_window;
+	uint16_t	in_service_window;
+	uint8_t		cqae;
+	uint16_t	packet_size;
+} __attribute__ ((packed)) vs_ext_flow_spec_cp;
+#define VS_EXT_FLOW_SPEC_CP_SIZE 11
+typedef struct {
+	uint8_t		status;
+	uint16_t	handle;
+	uint16_t	interval;
+	uint16_t	window;
+} __attribute__ ((packed)) vs_ext_flow_spec_rp;
+#define VS_EXT_FLOW_SPEC_RP_SIZE 7
+
 /* ---- HCI Events ---- */
 
 #define EVT_INQUIRY_COMPLETE		0x01
@@ -1924,10 +1957,9 @@ typedef struct {
 	uint8_t		status;
 	uint16_t	handle;
 	uint8_t		flags;
-	uint8_t		direction;
-	hci_qos		qos;
+	flow_spec	spec;
 } __attribute__ ((packed)) evt_flow_spec_complete;
-#define EVT_FLOW_SPEC_COMPLETE_SIZE (5 + HCI_QOS_CP_SIZE)
+#define EVT_FLOW_SPEC_COMPLETE_SIZE (4 + HCI_FLOW_SPEC_CP_SIZE)
 
 #define EVT_INQUIRY_RESULT_WITH_RSSI	0x22
 typedef struct {
@@ -2373,6 +2405,7 @@ struct hci_conn_info_req {
 struct hci_auth_info_req {
 	bdaddr_t bdaddr;
 	uint8_t  type;
+	uint8_t  sec_level;
 };
 
 struct hci_inquiry_req {
@@ -2383,6 +2416,40 @@ struct hci_inquiry_req {
 	uint8_t  num_rsp;
 };
 #define IREQ_CACHE_FLUSH 0x0001
+
+#define CQAE_DM1	0x83
+#define CQAE_DH1	0x84
+#define CQAE_DM3	0x8A
+#define CQAE_DH3	0x8B
+#define CQAE_DM5	0x8E
+#define CQAE_DH5	0x8F
+#define CQAE_2DH1	0x94
+#define CQAE_2DH3	0x9A
+#define CQAE_2DH5	0x9E
+#define CQAE_3DH1	0xA8
+#define CQAE_3DH3	0xAB
+#define CQAE_3DH5	0xAF
+
+#define PACKET_PAYLOAD_DM1	17
+#define PACKET_PAYLOAD_DM3	121
+#define PACKET_PAYLOAD_DM5	224
+#define PACKET_PAYLOAD_2DH1	54
+#define PACKET_PAYLOAD_2DH3	367
+#define PACKET_PAYLOAD_2DH5	679
+#define PACKET_PAYLOAD_3DH1	83
+#define PACKET_PAYLOAD_3DH3	552
+#define PACKET_PAYLOAD_3DH5	1021
+
+#define PACKET_LEN_1_SLOT_PKT	1
+#define PACKET_LEN_3_SLOT_PKT	3
+#define PACKET_LEN_5_SLOT_PKT	5
+
+#define SERVICE_TYPE_NO_TRAFFIC	0
+#define SERVICE_TYPE_BEST_EFFORT	1
+#define SERVICE_TYPE_GUARANTEED	2
+
+#define FLOW_DIRECTION_OUTGOING	0
+#define FLOW_DIRECTION_INCOMING	1
 
 #ifdef __cplusplus
 }

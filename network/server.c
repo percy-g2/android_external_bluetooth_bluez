@@ -46,13 +46,18 @@
 #include "error.h"
 #include "sdpd.h"
 #include "btio.h"
-#include "glib-helper.h"
+#include "glib-compat.h"
 
 #include "common.h"
 #include "server.h"
 
 #define NETWORK_SERVER_INTERFACE "org.bluez.NetworkServer"
 #define SETUP_TIMEOUT		1
+
+static uint128_t bluetooth_base_uuid = {
+	.data = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00,
+			0x80, 0x00, 0x00, 0x80, 0x5F, 0x9B, 0x34, 0xFB}
+};
 
 /* Pending Authorization */
 struct network_session {
@@ -414,6 +419,22 @@ static uint16_t bnep_setup_decode(struct bnep_setup_conn_req *req,
 		break;
 	case 4: /* UUID32 */
 	case 16: /* UUID128 */
+		/*
+		 * Check that the bytes in the UUID, except the service ID itself, are
+		 * correct. The service ID is checked in bnep_setup_chk().
+		 */
+		if (memcmp(dest, bluetooth_base_uuid.data, 2))
+			return BNEP_CONN_INVALID_DST;
+		if (memcmp(source, bluetooth_base_uuid.data, 2))
+			return BNEP_CONN_INVALID_SRC;
+
+		if (req->uuid_size == 16) {
+			if (memcmp(&dest[4], &bluetooth_base_uuid.data[4], 12))
+				return BNEP_CONN_INVALID_DST;
+			if (memcmp(&source[4], &bluetooth_base_uuid.data[4], 12))
+				return BNEP_CONN_INVALID_SRC;
+		}
+
 		*dst_role = ntohl(bt_get_unaligned((uint32_t *) dest));
 		*src_role = ntohl(bt_get_unaligned((uint32_t *) source));
 		break;
@@ -466,7 +487,7 @@ static gboolean bnep_setup(GIOChannel *chan,
 
 	/* Highest known Control command ID
 	 * is BNEP_FILTER_MULT_ADDR_RSP = 0x06 */
-	if (req->type == BNEP_CONTROL &&
+	if ((req->type & BNEP_TYPE_MASK) == BNEP_CONTROL &&
 				req->ctrl > BNEP_FILTER_MULT_ADDR_RSP) {
 		uint8_t pkt[3];
 
@@ -479,7 +500,8 @@ static gboolean bnep_setup(GIOChannel *chan,
 		return FALSE;
 	}
 
-	if (req->type != BNEP_CONTROL || req->ctrl != BNEP_SETUP_CONN_REQ)
+	if ((req->type & BNEP_TYPE_MASK) != BNEP_CONTROL ||
+				req->ctrl != BNEP_SETUP_CONN_REQ)
 		return FALSE;
 
 	rsp = bnep_setup_decode(req, &dst_role, &src_role);
@@ -509,9 +531,17 @@ static gboolean bnep_setup(GIOChannel *chan,
 	if (server_connadd(ns, na->setup, dst_role) < 0)
 		goto reply;
 
-	na->setup = NULL;
+	if (req->type & BNEP_EXT_HEADER) {
+		/* Extension header */
+		uint8_t req_len = sizeof(*req) + 2 * req->uuid_size;
 
-	rsp = BNEP_SUCCESS;
+		if (bnep_extensionreq(&na->setup->dst, n - req_len, &packet[req_len]))
+			error("bnep_setup: Failed to send extension");
+	}
+
+	na->setup = NULL;
+	/* Success case is handled by kernel */
+	return FALSE;
 
 reply:
 	send_bnep_ctrl_rsp(sk, rsp);

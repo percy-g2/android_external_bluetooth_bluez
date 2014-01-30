@@ -47,6 +47,7 @@
 #include "textfile.h"
 #include "adapter.h"
 #include "device.h"
+#include "glib-compat.h"
 #include "glib-helper.h"
 #include "storage.h"
 
@@ -1024,7 +1025,10 @@ int read_device_id(const gchar *srcaddr, const gchar *dstaddr,
 					uint16_t *source, uint16_t *vendor,
 					uint16_t *product, uint16_t *version)
 {
-	uint16_t lsource, lvendor, lproduct, lversion;
+	uint16_t lsource = 0xffff;
+	uint16_t lvendor = 0x0000;
+	uint16_t lproduct = 0x0000;
+	uint16_t lversion = 0x0000;
 	sdp_list_t *recs;
 	sdp_record_t *rec;
 	bdaddr_t src, dst;
@@ -1064,17 +1068,6 @@ int read_device_id(const gchar *srcaddr, const gchar *dstaddr,
 	}
 
 	sdp_list_free(recs, (sdp_free_func_t)sdp_record_free);
-
-	if (err) {
-		/* FIXME: We should try EIR data if we have it, too */
-
-		/* If we don't have the data, we don't want to go through the
-		 * above search every time. */
-		lsource = 0xffff;
-		lvendor = 0x0000;
-		lproduct = 0x0000;
-		lversion = 0x0000;
-	}
 
 	store_device_id(srcaddr, dstaddr, lsource, lvendor, lproduct, lversion);
 
@@ -1307,7 +1300,7 @@ int read_device_attributes(const bdaddr_t *sba, textfile_cb func, void *data)
 }
 
 int write_device_type(const bdaddr_t *sba, const bdaddr_t *dba,
-						device_type_t type)
+							addr_type_t type)
 {
 	char filename[PATH_MAX + 1], addr[18], chars[3];
 
@@ -1322,10 +1315,10 @@ int write_device_type(const bdaddr_t *sba, const bdaddr_t *dba,
 	return textfile_put(filename, addr, chars);
 }
 
-device_type_t read_device_type(const bdaddr_t *sba, const bdaddr_t *dba)
+addr_type_t read_device_type(const bdaddr_t *sba, const bdaddr_t *dba)
 {
 	char filename[PATH_MAX + 1], addr[18], *chars;
-	device_type_t type;
+	addr_type_t type;
 
 	create_filename(filename, PATH_MAX, sba, "types");
 
@@ -1335,7 +1328,7 @@ device_type_t read_device_type(const bdaddr_t *sba, const bdaddr_t *dba)
 
 	chars = textfile_caseget(filename, addr);
 	if (chars == NULL)
-		return DEVICE_TYPE_UNKNOWN;
+		return ADDR_TYPE_UNKNOWN;
 
 	type = strtol(chars, NULL, 16);
 

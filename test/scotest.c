@@ -69,6 +69,7 @@ static int do_connect(char *svr)
 {
 	struct sockaddr_sco addr;
 	struct sco_conninfo conn;
+	struct bt_sco_parameters p;
 	socklen_t optlen;
 	int sk;
 
@@ -91,10 +92,25 @@ static int do_connect(char *svr)
 		goto error;
 	}
 
+	/* Update SCO parameters */
+	optlen = sizeof(p);
+	memset(&p, 0, optlen);
+
+	if (getsockopt(sk, SOL_BLUETOOTH, BT_SCO_PARAMETERS, &p, &optlen) < 0) {
+		syslog(LOG_ERR, "%s: getsockopt() failed: %s", __FUNCTION__, strerror(errno));
+		goto error;
+	}
+
+	p.pkt_type = pkt_type;
+
+	if (setsockopt(sk, SOL_BLUETOOTH, BT_SCO_PARAMETERS, &p, optlen) < 0) {
+		syslog(LOG_ERR, "%s: setsockopt() failed: %s", __FUNCTION__, strerror(errno));
+		goto error;
+	}
+
 	/* Connect to remote device */
 	memset(&addr, 0, sizeof(addr));
 	addr.sco_family = AF_BLUETOOTH;
-	addr.sco_pkt_type = pkt_type;
 	str2ba(svr, &addr.sco_bdaddr);
 
 	if (connect(sk, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
@@ -143,7 +159,6 @@ static void do_listen(void (*handler)(int sk))
 	/* Bind to local address */
 	memset(&addr, 0, sizeof(addr));
 	addr.sco_family = AF_BLUETOOTH;
-	addr.sco_pkt_type = pkt_type;
 	bacpy(&addr.sco_bdaddr, &bdaddr);
 
 	if (bind(sk, (struct sockaddr *) &addr, sizeof(addr)) < 0) {

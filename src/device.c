@@ -53,8 +53,10 @@
 #include "dbus-common.h"
 #include "event.h"
 #include "error.h"
+#include "glib-compat.h"
 #include "glib-helper.h"
 #include "gattrib.h"
+#include "sdp-client.h"
 #include "gatt.h"
 #include "agent.h"
 #include "sdp-xml.h"
@@ -106,7 +108,7 @@ struct browse_req {
 
 struct btd_device {
 	bdaddr_t	bdaddr;
-	device_type_t	type;
+	addr_type_t	type;
 	gchar		*path;
 	char		name[MAX_NAME_LENGTH + 1];
 	char		*alias;
@@ -136,6 +138,7 @@ struct btd_device {
 
 	gboolean	authorizing;
 	gint		ref;
+	uint8_t		features[8];
 };
 
 static uint16_t uuid_list[] = {
@@ -226,9 +229,24 @@ static void device_free(gpointer user_data)
 	g_free(device);
 }
 
+gboolean device_is_bredr(struct btd_device *device)
+{
+	return (device->type == ADDR_TYPE_BREDR);
+}
+
+gboolean device_is_le(struct btd_device *device)
+{
+	return (device->type != ADDR_TYPE_BREDR);
+}
+
 gboolean device_is_paired(struct btd_device *device)
 {
 	return device->paired;
+}
+
+gboolean device_is_bonded(struct btd_device *device)
+{
+	return device->bonded;
 }
 
 gboolean device_is_trusted(struct btd_device *device)
@@ -905,7 +923,7 @@ void device_remove_connection(struct btd_device *device, DBusConnection *conn)
 		device->disconnects = g_slist_remove(device->disconnects, msg);
 	}
 
-	if (device_is_paired(device) && !device->bonded)
+	if (device_is_paired(device) && !device_is_bonded(device))
 		device_set_paired(device, FALSE);
 
 	emit_property_changed(conn, device->path,
@@ -951,7 +969,7 @@ void device_remove_disconnect_watch(struct btd_device *device, guint id)
 
 struct btd_device *device_create(DBusConnection *conn,
 				struct btd_adapter *adapter,
-				const gchar *address, device_type_t type)
+				const gchar *address, addr_type_t type)
 {
 	gchar *address_up;
 	struct btd_device *device;
@@ -991,7 +1009,7 @@ struct btd_device *device_create(DBusConnection *conn,
 		device_block(conn, device);
 
 	if (read_link_key(&src, &device->bdaddr, NULL, NULL) == 0) {
-		device->paired = TRUE;
+		device_set_paired(device, TRUE);
 		device_set_bonded(device, TRUE);
 	}
 
@@ -1024,11 +1042,6 @@ void device_get_name(struct btd_device *device, char *name, size_t len)
 	strncpy(name, device->name, len);
 }
 
-device_type_t device_get_type(struct btd_device *device)
-{
-	return device->type;
-}
-
 void device_remove_bonding(struct btd_device *device)
 {
 	char filename[PATH_MAX + 1];
@@ -1058,8 +1071,12 @@ static void device_remove_stored(struct btd_device *device)
 	adapter_get_address(device->adapter, &src);
 	ba2str(&device->bdaddr, addr);
 
-	if (device->paired)
-		device_remove_bonding(device);
+	if (device_is_bonded(device)) {
+		delete_entry(&src, "linkkeys", addr);
+		delete_entry(&src, "aliases", addr);
+		device_set_bonded(device, FALSE);
+		device_set_paired(device, FALSE);
+	}
 	delete_entry(&src, "profiles", addr);
 	delete_entry(&src, "trusts", addr);
 	delete_entry(&src, "types", addr);
@@ -1559,7 +1576,7 @@ cleanup:
 		bdaddr_t sba, dba;
 
 		adapter_get_address(device->adapter, &sba);
-		device_get_address(device, &dba);
+		device_get_address(device, &dba, NULL);
 
 		store_profiles(device);
 		write_device_type(&sba, &dba, device->type);
@@ -1648,7 +1665,7 @@ static void store_services(struct btd_device *device)
 	char *str = primary_list_to_string(device->primaries);
 
 	adapter_get_address(adapter, &sba);
-	device_get_address(device, &dba);
+	device_get_address(device, &dba, NULL);
 
 	write_device_type(&sba, &dba, device->type);
 	write_device_services(&sba, &dba, str);
@@ -1830,9 +1847,12 @@ struct btd_adapter *device_get_adapter(struct btd_device *device)
 	return device->adapter;
 }
 
-void device_get_address(struct btd_device *device, bdaddr_t *bdaddr)
+void device_get_address(struct btd_device *device, bdaddr_t *bdaddr,
+							addr_type_t *type)
 {
 	bacpy(bdaddr, &device->bdaddr);
+	if (type != NULL)
+		*type = device->type;
 }
 
 const gchar *device_get_path(struct btd_device *device)
@@ -1884,12 +1904,13 @@ void device_set_bonded(struct btd_device *device, gboolean bonded)
 	device->bonded = bonded;
 }
 
-void device_set_type(struct btd_device *device, device_type_t type)
+void device_set_type(struct btd_device *device, addr_type_t type)
 {
 	if (!device)
 		return;
 
 	device->type = type;
+
 }
 
 static gboolean start_discovery(gpointer user_data)
@@ -2001,6 +2022,9 @@ void device_set_paired(struct btd_device *device, gboolean value)
 
 	if (device->paired == value)
 		return;
+
+	if (!value)
+		btd_adapter_remove_bonding(device->adapter, &device->bdaddr);
 
 	device->paired = value;
 
@@ -2157,7 +2181,7 @@ void device_bonding_complete(struct btd_device *device, uint8_t status)
 	// Temporary hack till we move to mgmt interface.
 	if (status == 0x06 && auth == NULL) {
 		device_remove_bonding(device);
-		device_get_address(device, &bdaddr);
+		device_get_address(device, &bdaddr, NULL);
 		btd_adapter_retry_authentication(device->adapter, &bdaddr);
 		return;
 	} else if (status) {
@@ -2563,4 +2587,22 @@ void device_set_class(struct btd_device *device, uint32_t value)
 
 	emit_property_changed(conn, device->path, DEVICE_INTERFACE, "Class",
 				DBUS_TYPE_UINT32, &value);
+}
+
+void device_set_features(struct btd_device *device, uint8_t *features)
+{
+	if (!device)
+		return;
+
+	memcpy(device->features, features, sizeof(device->features));
+}
+
+uint8_t *device_get_features(struct btd_device *device)
+{
+	return device->features;
+}
+
+void device_set_qos(struct btd_device *device, struct ste_qos_params *params)
+{
+	btd_adapter_set_qos(device->adapter, &device->bdaddr, params);
 }

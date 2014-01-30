@@ -52,7 +52,7 @@
 #include "manager.h"
 #include "control.h"
 #include "avdtp.h"
-#include "glib-helper.h"
+#include "glib-compat.h"
 #include "btio.h"
 #include "sink.h"
 #include "source.h"
@@ -1134,19 +1134,29 @@ static void release_stream(struct avdtp_stream *stream, struct avdtp *session)
 	avdtp_sep_set_state(session, sep, AVDTP_STATE_IDLE);
 }
 
+static int avdtp_cancel_authorization(struct avdtp *session)
+{
+	struct audio_device *dev;
+
+	if (session->state != AVDTP_SESSION_STATE_CONNECTING)
+		return 0;
+
+	dev = manager_get_device(&session->server->src, &session->dst, FALSE);
+	if (dev == NULL)
+		return -ENODEV;
+
+	return audio_device_cancel_authorization(dev, auth_cb, session);
+}
+
 static void connection_lost(struct avdtp *session, int err)
 {
 	char address[18];
-	struct audio_device *dev;
 
 	ba2str(&session->dst, address);
 	DBG("Disconnected from %s", address);
 
-	dev = manager_get_device(&session->server->src, &session->dst, FALSE);
-
-	if (dev != NULL && session->state == AVDTP_SESSION_STATE_CONNECTING &&
-								err != EACCES)
-		audio_device_cancel_authorization(dev, auth_cb, session);
+	if (err != EACCES)
+		avdtp_cancel_authorization(session);
 
 	session->free_lock = 1;
 
@@ -1195,11 +1205,7 @@ void avdtp_unref(struct avdtp *session)
 	if (session->ref == 1) {
 		if (session->state == AVDTP_SESSION_STATE_CONNECTING &&
 								session->io) {
-			struct audio_device *dev;
-			dev = manager_get_device(&session->server->src,
-							&session->dst, FALSE);
-			audio_device_cancel_authorization(dev, auth_cb,
-								session);
+			avdtp_cancel_authorization(session);
 			g_io_channel_shutdown(session->io, TRUE, NULL);
 			g_io_channel_unref(session->io);
 			session->io = NULL;
@@ -1244,6 +1250,28 @@ struct avdtp *avdtp_ref(struct avdtp *session)
 	if (session->dc_timer)
 		remove_disconnect_timer(session);
 	return session;
+}
+
+struct avdtp *avdtp_get_session(struct avdtp_stream *stream)
+{
+	if (stream)
+		return stream->session;
+	return NULL;
+}
+
+uint16_t avdtp_get_delay(struct avdtp_stream *stream)
+{
+	if (stream)
+		return stream->delay;
+	return 0;
+}
+
+void avdtp_set_delay(struct avdtp_stream *stream, uint16_t delay)
+{
+	/* If delay reporting is supported do not set the value here since it is
+	already set in stream. */
+	if (stream && !stream->delay_reporting)
+		stream->delay = delay;
 }
 
 static struct avdtp_local_sep *find_local_sep_by_seid(struct avdtp_server *server,
@@ -1905,6 +1933,9 @@ static gboolean avdtp_delayreport_cmd(struct avdtp *session,
 	stream = sep->stream;
 
 	if (sep->state != AVDTP_STATE_CONFIGURED &&
+#ifdef SUPPORT_A2DP_1_3
+					sep->state != AVDTP_STATE_OPEN &&
+#endif
 					sep->state != AVDTP_STATE_STREAMING) {
 		err = AVDTP_BAD_STATE;
 		goto failed;
@@ -3664,6 +3695,9 @@ int avdtp_delay_report(struct avdtp *session, struct avdtp_stream *stream,
 		return -EINVAL;
 
 	if (stream->lsep->state != AVDTP_STATE_CONFIGURED &&
+#ifdef SUPPORT_A2DP_1_3
+				stream->lsep->state != AVDTP_STATE_OPEN &&
+#endif
 				stream->lsep->state != AVDTP_STATE_STREAMING)
 		return -EINVAL;
 

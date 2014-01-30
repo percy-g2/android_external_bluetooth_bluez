@@ -33,7 +33,7 @@
 #include <stdlib.h>
 #include <sys/ioctl.h>
 
-#ifdef ANDROID_EXPAND_NAME
+#ifdef ANDROID
 #include <cutils/properties.h>
 #endif
 
@@ -57,6 +57,7 @@
 #include "dbus-common.h"
 #include "event.h"
 #include "error.h"
+#include "glib-compat.h"
 #include "glib-helper.h"
 #include "agent.h"
 #include "storage.h"
@@ -78,6 +79,14 @@
 #define IO_CAPABILITY_KEYBOARDONLY	0x02
 #define IO_CAPABILITY_NOINPUTNOOUTPUT	0x03
 #define IO_CAPABILITY_INVALID		0xFF
+
+/* Supported AG features*/
+#define AG_THREE_WAY_CALL		0x01 /*Three way calling*/
+#define AG_EC_NR_FUNC			0x02 /*EC and/or NR function*/
+#define AG_VOICE_RECOGNITION		0x04 /*Voice recognition*/
+#define AG_RINGTONE_CAP			0x08 /*In-band ring tone capability*/
+#define AG_VOICE_TAG			0x10 /*Attach phone number to a voice tag*/
+#define AG_WBS				0x20 /*Wideband speech*/
 
 #define check_address(address) bachk(address)
 
@@ -704,7 +713,7 @@ static GSList *remove_bredr(GSList *all)
 
 	for (l = all, le = NULL; l; l = l->next) {
 		struct remote_dev_info *dev = l->data;
-		if (dev->le == FALSE) {
+		if (dev->type == ADDR_TYPE_BREDR) {
 			dev_info_free(dev);
 			continue;
 		}
@@ -1149,7 +1158,7 @@ void adapter_service_remove(struct btd_adapter *adapter, void *r)
 static struct btd_device *adapter_create_device(DBusConnection *conn,
 						struct btd_adapter *adapter,
 						const char *address,
-						device_type_t type)
+						addr_type_t type)
 {
 	struct btd_device *device;
 	const char *path;
@@ -1216,7 +1225,7 @@ struct btd_device *adapter_get_device(DBusConnection *conn,
 		return device;
 
 	return adapter_create_device(conn, adapter, address,
-						DEVICE_TYPE_BREDR);
+						ADDR_TYPE_BREDR);
 }
 
 static int start_discovery(struct btd_adapter *adapter)
@@ -1623,21 +1632,21 @@ static DBusMessage *cancel_device_creation(DBusConnection *conn,
 
 static struct btd_device *create_device_internal(DBusConnection *conn,
 						struct btd_adapter *adapter,
-						const gchar *address, int *err)
+						const char *address, int *err)
 {
 	struct remote_dev_info *dev, match;
 	struct btd_device *device;
-	device_type_t type;
+	addr_type_t type;
 
 	memset(&match, 0, sizeof(struct remote_dev_info));
 	str2ba(address, &match.bdaddr);
 	match.name_status = NAME_ANY;
 
 	dev = adapter_search_found_devices(adapter, &match);
-	if (dev && dev->le)
-		type = DEVICE_TYPE_LE;
+	if (dev)
+		type = dev->type;
 	else
-		type = DEVICE_TYPE_BREDR;
+		type = ADDR_TYPE_BREDR;
 
 	device = adapter_create_device(conn, adapter, address, type);
 	if (!device && err)
@@ -1674,7 +1683,7 @@ static DBusMessage *create_device(DBusConnection *conn,
 	if (!device)
 		goto failed;
 
-	if (device_get_type(device) != DEVICE_TYPE_LE)
+	if (device_is_bredr(device))
 		err = device_browse_sdp(device, conn, msg, NULL, FALSE);
 	else
 		err = device_browse_primary(device, conn, msg, FALSE);
@@ -1756,7 +1765,7 @@ static DBusMessage *create_paired_device(DBusConnection *conn,
 			return btd_error_failed(msg, strerror(-err));
 	}
 
-	if (device_get_type(device) != DEVICE_TYPE_LE)
+	if (device_is_bredr(device))
 		return device_create_bonding(device, conn, msg,
 							agent_path, cap);
 
@@ -2077,9 +2086,15 @@ static int add_handsfree_ag_record(struct btd_adapter* adapter) {
 	sdp_list_t *aproto, *proto[2];
 	sdp_record_t *record;
 	uint8_t u8 = 10;
-	uint16_t u16 = 0x17;
+	uint16_t u16 = AG_THREE_WAY_CALL | AG_EC_NR_FUNC |
+			AG_VOICE_RECOGNITION | AG_VOICE_TAG;
 #ifdef ANDROID
-	u16 = 0x07;
+	char value[PROPERTY_VALUE_MAX];
+	u16 = AG_THREE_WAY_CALL | AG_EC_NR_FUNC; //AG supported features
+
+	property_get("bt.hfp.wideband", value, "0");
+	if (atoi(value))
+		u16 |= AG_WBS; // wideband supported
 #endif
 	sdp_data_t *channel, *features;
 	uint8_t netid = 0x01; // ???? profile document
@@ -2100,7 +2115,11 @@ static int add_handsfree_ag_record(struct btd_adapter* adapter) {
 	sdp_set_service_classes(record, svclass_id);
 
 	sdp_uuid16_create(&profile.uuid, HANDSFREE_PROFILE_ID);
+#ifndef ANDROID
 	profile.version = 0x0105;
+#else
+	profile.version = 0x0106;
+#endif
 	pfseq = sdp_list_append(0, &profile);
 	sdp_set_profile_descs(record, pfseq);
 
@@ -2282,12 +2301,225 @@ static int add_opush_record(struct btd_adapter *adapter)
 	return ret;
 }
 
+static int add_ftp_record(struct btd_adapter *adapter)
+{
+	sdp_list_t *svclass_id, *pfseq, *apseq, *root;
+	uuid_t root_uuid, ftrn_uuid, l2cap_uuid, rfcomm_uuid, obex_uuid;
+	sdp_profile_desc_t profile[1];
+	sdp_list_t *aproto, *proto[3];
+	sdp_record_t *record;
+	uint8_t u8 = 21;
+	sdp_data_t *channel;
+	int ret = 0;
+
+	record = sdp_record_alloc();
+	if (!record)
+		return -1;
+
+	sdp_uuid16_create(&root_uuid, PUBLIC_BROWSE_GROUP);
+	root = sdp_list_append(0, &root_uuid);
+	sdp_set_browse_groups(record, root);
+
+	sdp_uuid16_create(&ftrn_uuid, OBEX_FILETRANS_SVCLASS_ID);
+	svclass_id = sdp_list_append(0, &ftrn_uuid);
+	sdp_set_service_classes(record, svclass_id);
+
+	sdp_uuid16_create(&profile[0].uuid, OBEX_FILETRANS_PROFILE_ID);
+	profile[0].version = 0x0100;
+	pfseq = sdp_list_append(0, &profile[0]);
+	sdp_set_profile_descs(record, pfseq);
+
+	sdp_uuid16_create(&l2cap_uuid, L2CAP_UUID);
+	proto[0] = sdp_list_append(0, &l2cap_uuid);
+	apseq = sdp_list_append(0, proto[0]);
+
+	sdp_uuid16_create(&rfcomm_uuid, RFCOMM_UUID);
+	proto[1] = sdp_list_append(0, &rfcomm_uuid);
+	channel = sdp_data_alloc(SDP_UINT8, &u8);
+	proto[1] = sdp_list_append(proto[1], channel);
+	apseq = sdp_list_append(apseq, proto[1]);
+
+	sdp_uuid16_create(&obex_uuid, OBEX_UUID);
+	proto[2] = sdp_list_append(0, &obex_uuid);
+	apseq = sdp_list_append(apseq, proto[2]);
+
+	aproto = sdp_list_append(0, apseq);
+	sdp_set_access_protos(record, aproto);
+
+	sdp_set_info_attr(record, "OBEX File Transfer", 0, 0);
+
+	if (add_record_to_server(&adapter->bdaddr, record) < 0)
+		ret = -1;
+
+end:
+	sdp_data_free(channel);
+	sdp_list_free(proto[0], 0);
+	sdp_list_free(proto[1], 0);
+	sdp_list_free(proto[2], 0);
+	sdp_list_free(apseq, 0);
+	sdp_list_free(aproto, 0);
+
+	if (!ret)
+		return record->handle;
+	return ret;
+}
+
+static int add_map_email_record(struct btd_adapter *adapter)
+{
+	sdp_list_t *svclass_id, *pfseq, *apseq, *root;
+	uuid_t root_uuid, mas_uuid, l2cap_uuid, rfcomm_uuid, obex_uuid;
+	sdp_profile_desc_t profile[1];
+	sdp_list_t *aproto, *proto[3];
+	sdp_record_t *record;
+	uint8_t u8 = 25;
+        uint8_t mas_instance = 0x01, supported_msgtype = 0x01; /* email */
+	sdp_data_t *channel;
+	int ret = 0;
+
+	record = sdp_record_alloc();
+	if (!record)
+		return -1;
+
+	sdp_uuid16_create(&root_uuid, PUBLIC_BROWSE_GROUP);
+	root = sdp_list_append(0, &root_uuid);
+	sdp_set_browse_groups(record, root);
+
+	sdp_uuid16_create(&mas_uuid, MESSAGE_ACCESS_SERVER_PROFILE_ID);
+	svclass_id = sdp_list_append(0, &mas_uuid);
+	sdp_set_service_classes(record, svclass_id);
+
+	sdp_uuid16_create(&profile[0].uuid, MESSAGE_ACCESS_PROFILE_ID);
+	profile[0].version = 0x0100;
+	pfseq = sdp_list_append(0, &profile[0]);
+	sdp_set_profile_descs(record, pfseq);
+
+	sdp_uuid16_create(&l2cap_uuid, L2CAP_UUID);
+	proto[0] = sdp_list_append(0, &l2cap_uuid);
+	apseq = sdp_list_append(0, proto[0]);
+
+	sdp_uuid16_create(&rfcomm_uuid, RFCOMM_UUID);
+	proto[1] = sdp_list_append(0, &rfcomm_uuid);
+	channel = sdp_data_alloc(SDP_UINT8, &u8);
+	proto[1] = sdp_list_append(proto[1], channel);
+	apseq = sdp_list_append(apseq, proto[1]);
+
+	sdp_uuid16_create(&obex_uuid, OBEX_UUID);
+	proto[2] = sdp_list_append(0, &obex_uuid);
+	apseq = sdp_list_append(apseq, proto[2]);
+
+	aproto = sdp_list_append(0, apseq);
+	sdp_set_access_protos(record, aproto);
+
+	sdp_set_info_attr(record, "EMAIL", 0, 0);
+
+	sdp_attr_add_new(record, SDP_ATTR_MAP_MASINSTANCE_ID,
+						SDP_UINT8, &mas_instance);
+
+	sdp_attr_add_new(record, SDP_ATTR_MAP_SUPPORTED_MSG_TYPE,
+						SDP_UINT8, &supported_msgtype);
+
+	if (add_record_to_server(&adapter->bdaddr, record) < 0){
+		ret = -1;
+		goto end;
+	}
+
+	DBG("Message Access Service registered\n");
+
+end:
+	sdp_data_free(channel);
+	sdp_list_free(proto[0], 0);
+	sdp_list_free(proto[1], 0);
+	sdp_list_free(proto[2], 0);
+	sdp_list_free(apseq, 0);
+	sdp_list_free(aproto, 0);
+
+	if (!ret)
+		return record->handle;
+	return ret;
+}
+
+
+static int add_map_sms_record(struct btd_adapter *adapter)
+{
+	sdp_list_t *svclass_id, *pfseq, *apseq, *root;
+	uuid_t root_uuid, mas_uuid, l2cap_uuid, rfcomm_uuid, obex_uuid;
+	sdp_profile_desc_t profile[1];
+	sdp_list_t *aproto, *proto[3];
+	sdp_record_t *record;
+	uint8_t u8 = 23;
+	uint8_t mas_instance = 0x00, supported_msgtype = 0x02; /* sms_gsm */
+	sdp_data_t *channel;
+	int ret = 0;
+
+	record = sdp_record_alloc();
+	if (!record)
+		return -1;
+
+	sdp_uuid16_create(&root_uuid, PUBLIC_BROWSE_GROUP);
+	root = sdp_list_append(0, &root_uuid);
+	sdp_set_browse_groups(record, root);
+
+	sdp_uuid16_create(&mas_uuid, MESSAGE_ACCESS_SERVER_PROFILE_ID);
+	svclass_id = sdp_list_append(0, &mas_uuid);
+	sdp_set_service_classes(record, svclass_id);
+
+	sdp_uuid16_create(&profile[0].uuid, MESSAGE_ACCESS_PROFILE_ID);
+	profile[0].version = 0x0100;
+	pfseq = sdp_list_append(0, &profile[0]);
+	sdp_set_profile_descs(record, pfseq);
+
+	sdp_uuid16_create(&l2cap_uuid, L2CAP_UUID);
+	proto[0] = sdp_list_append(0, &l2cap_uuid);
+	apseq = sdp_list_append(0, proto[0]);
+
+	sdp_uuid16_create(&rfcomm_uuid, RFCOMM_UUID);
+	proto[1] = sdp_list_append(0, &rfcomm_uuid);
+	channel = sdp_data_alloc(SDP_UINT8, &u8);
+	proto[1] = sdp_list_append(proto[1], channel);
+	apseq = sdp_list_append(apseq, proto[1]);
+
+	sdp_uuid16_create(&obex_uuid, OBEX_UUID);
+	proto[2] = sdp_list_append(0, &obex_uuid);
+	apseq = sdp_list_append(apseq, proto[2]);
+
+	aproto = sdp_list_append(0, apseq);
+	sdp_set_access_protos(record, aproto);
+
+	sdp_set_info_attr(record, "SMS", 0, 0);
+
+	sdp_attr_add_new(record, SDP_ATTR_MAP_MASINSTANCE_ID,
+						SDP_UINT8, &mas_instance);
+
+	sdp_attr_add_new(record, SDP_ATTR_MAP_SUPPORTED_MSG_TYPE,
+						SDP_UINT8, &supported_msgtype);
+
+	if (add_record_to_server(&adapter->bdaddr, record) < 0) {
+		ret = -1;
+		goto end;
+	}
+
+	DBG("Message Access Service registered\n");
+end:
+	sdp_data_free(channel);
+	sdp_list_free(proto[0], 0);
+	sdp_list_free(proto[1], 0);
+	sdp_list_free(proto[2], 0);
+	sdp_list_free(apseq, 0);
+	sdp_list_free(aproto, 0);
+
+	if (!ret)
+		return record->handle;
+	return ret;
+}
+
+
 static DBusMessage *add_reserved_service_records(DBusConnection *conn,
 						DBusMessage *msg, void *data) {
 	DBusMessage *reply;
 	struct btd_adapter *adapter = data;
 	uint32_t *svc_classes;
 	uint32_t *handles;
+	uint32_t map_sms_handle;
 	uint32_t len, i;
 	int ret;
 
@@ -2311,6 +2543,18 @@ static DBusMessage *add_reserved_service_records(DBusConnection *conn,
 			case OBEX_OBJPUSH_SVCLASS_ID:
 				ret = add_opush_record(adapter);
 				break;
+			case OBEX_FILETRANS_SVCLASS_ID:
+				ret = add_ftp_record(adapter);
+				break;
+			case MAP_SERVER_SVCLASS_ID:
+				ret = add_map_sms_record(adapter);
+				if (ret >= 0) {
+					map_sms_handle = ret;
+					ret = add_map_email_record(adapter);
+					if (ret < 0)
+						remove_record_from_server(map_sms_handle);
+				}
+				break;
 		}
 		if (ret < 0) {
 			g_free(handles);
@@ -2332,7 +2576,7 @@ static DBusMessage *remove_reserved_service_records(DBusConnection *conn,
 							DBusMessage *msg, void *data) {
 	uint32_t *handles;
 	uint32_t len, i;
-	
+
 	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_ARRAY, DBUS_TYPE_UINT32,
 				&handles, &len, DBUS_TYPE_INVALID) == FALSE)
 		return btd_error_invalid_args(msg);
@@ -2368,7 +2612,7 @@ static DBusMessage *set_link_timeout(DBusConnection *conn,
                 return g_dbus_create_error(msg,
                                 ERROR_INTERFACE ".DoesNotExist",
                                 "Device does not exist");
-	device_get_address(l->data, &bdaddr);
+	device_get_address(l->data, &bdaddr, NULL);
 
 	err = adapter_ops->set_link_timeout(adapter->dev_id, &bdaddr,
 			num_slots);
@@ -2429,7 +2673,7 @@ static void create_stored_device_from_profiles(char *key, char *value,
 				key, (GCompareFunc) device_address_cmp))
 		return;
 
-	device = device_create(connection, adapter, key, DEVICE_TYPE_BREDR);
+	device = device_create(connection, adapter, key, ADDR_TYPE_BREDR);
 	if (!device)
 		return;
 
@@ -2501,7 +2745,7 @@ static void create_stored_device_from_linkkeys(char *key, char *value,
 					(GCompareFunc) device_address_cmp))
 		return;
 
-	device = device_create(connection, adapter, key, DEVICE_TYPE_BREDR);
+	device = device_create(connection, adapter, key, ADDR_TYPE_BREDR);
 	if (device) {
 		device_set_temporary(device, FALSE);
 		adapter->devices = g_slist_append(adapter->devices, device);
@@ -2518,7 +2762,7 @@ static void create_stored_device_from_blocked(char *key, char *value,
 				key, (GCompareFunc) device_address_cmp))
 		return;
 
-	device = device_create(connection, adapter, key, DEVICE_TYPE_BREDR);
+	device = device_create(connection, adapter, key, ADDR_TYPE_BREDR);
 	if (device) {
 		device_set_temporary(device, FALSE);
 		adapter->devices = g_slist_append(adapter->devices, device);
@@ -2596,7 +2840,8 @@ static void create_stored_device_from_primary(char *key, char *value,
 			key, (GCompareFunc) device_address_cmp))
 		return;
 
-	device = device_create(connection, adapter, key, DEVICE_TYPE_LE);
+	/* FIXME: Get the correct LE addr type (public/random) */
+	device = device_create(connection, adapter, key, ADDR_TYPE_LE_PUBLIC);
 	if (!device)
 		return;
 
@@ -3374,7 +3619,7 @@ void adapter_emit_device_found(struct btd_adapter *adapter,
 		dev->uuid_count = uuid_count;
 	}
 
-	if (dev->le) {
+	if (dev->type != ADDR_TYPE_BREDR) {
 		gboolean broadcaster;
 
 		if (dev->flags & (EIR_LIM_DISC | EIR_GEN_DISC))
@@ -3427,7 +3672,7 @@ void adapter_emit_device_found(struct btd_adapter *adapter,
 }
 
 static struct remote_dev_info *found_device_new(const bdaddr_t *bdaddr,
-					gboolean le, const char *name,
+					addr_type_t type, const char *name,
 					const char *alias, uint32_t class,
 					gboolean legacy, name_status_t status,
 					int flags)
@@ -3436,7 +3681,7 @@ static struct remote_dev_info *found_device_new(const bdaddr_t *bdaddr,
 
 	dev = g_new0(struct remote_dev_info, 1);
 	bacpy(&dev->bdaddr, bdaddr);
-	dev->le = le;
+	dev->type = type;
 	dev->name = g_strdup(name);
 	dev->alias = g_strdup(alias);
 	dev->class = class;
@@ -3505,14 +3750,16 @@ static char *read_stored_data(bdaddr_t *local, bdaddr_t *peer, const char *file)
 	return textfile_get(filename, peer_addr);
 }
 
-void adapter_update_found_devices(struct btd_adapter *adapter, bdaddr_t *bdaddr,
-						uint32_t class, int8_t rssi,
-						uint8_t *data)
+void adapter_update_found_devices(struct btd_adapter *adapter,
+					bdaddr_t *bdaddr, addr_type_t type,
+					uint32_t class, int8_t rssi,
+					uint8_t confirm_name,
+					uint8_t *data, uint8_t data_len)
 {
 	struct remote_dev_info *dev, match;
 	struct eir_data eir_data;
 	char *alias, *name;
-	gboolean legacy, le;
+	gboolean legacy;
 	name_status_t name_status;
 	int err;
 
@@ -3547,9 +3794,7 @@ void adapter_update_found_devices(struct btd_adapter *adapter, bdaddr_t *bdaddr,
 
 	name = read_stored_data(&adapter->bdaddr, bdaddr, "names");
 
-	if (eir_data.flags < 0) {
-		le = FALSE;
-
+	if (type == ADDR_TYPE_BREDR) {
 		legacy = pairing_is_legacy(&adapter->bdaddr, bdaddr, data,
 									name);
 
@@ -3559,14 +3804,13 @@ void adapter_update_found_devices(struct btd_adapter *adapter, bdaddr_t *bdaddr,
 		else
 			name_status = NAME_NOT_REQUIRED;
 	} else {
-		le = TRUE;
 		legacy = FALSE;
 		name_status = NAME_NOT_REQUIRED;
 	}
 
 	alias = read_stored_data(&adapter->bdaddr, bdaddr, "aliases");
 
-	dev = found_device_new(bdaddr, le, name, alias, class, legacy,
+	dev = found_device_new(bdaddr, type, name, alias, class, legacy,
 						name_status, eir_data.flags);
 	free(name);
 	free(alias);
@@ -4145,4 +4389,16 @@ int btd_adapter_remove_remote_oob_data(struct btd_adapter *adapter,
 							bdaddr_t *bdaddr)
 {
 	return adapter_ops->remove_remote_oob_data(adapter->dev_id, bdaddr);
+}
+
+int btd_adapter_set_qos(struct btd_adapter *adapter, bdaddr_t *bdaddr,
+						struct ste_qos_params *params)
+{
+	return adapter_ops->set_qos(adapter->dev_id, bdaddr, params);
+}
+
+int btd_adapter_forbid_role_switch(struct btd_adapter *adapter,
+							bdaddr_t *bdaddr)
+{
+	return adapter_ops->forbid_role_switch(adapter->dev_id, bdaddr);
 }

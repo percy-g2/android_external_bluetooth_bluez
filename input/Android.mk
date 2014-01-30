@@ -14,7 +14,10 @@ LOCAL_SRC_FILES:= \
 LOCAL_CFLAGS:= \
 	-DVERSION=\"4.93\" \
 	-DSTORAGEDIR=\"/data/misc/bluetoothd\" \
-	-DCONFIGDIR=\"/etc/bluetooth\"
+	-DCONFIGDIR=\"/etc/bluetooth\" \
+	-DDEBUG_SECTION=\"_input\" \
+	-Wno-missing-field-initializers \
+	-Wno-pointer-arith
 
 LOCAL_C_INCLUDES:= \
 	$(LOCAL_PATH)/../btio \

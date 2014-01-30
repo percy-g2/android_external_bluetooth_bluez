@@ -53,10 +53,13 @@
 #include "unix.h"
 #include "avdtp.h"
 #include "control.h"
+#include "avctp.h"
+#include "avrcp.h"
 #include "headset.h"
 #include "gateway.h"
 #include "sink.h"
 #include "source.h"
+#include "android_bluez.h"
 
 #define AUDIO_INTERFACE "org.bluez.Audio"
 

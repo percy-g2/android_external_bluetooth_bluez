@@ -10,7 +10,9 @@ LOCAL_SRC_FILES:= \
 	avinfo.c
 
 LOCAL_CFLAGS:= \
-	-DVERSION=\"4.93\"
+	-DVERSION=\"4.93\" \
+	-Wno-missing-field-initializers \
+	-Wno-pointer-arith
 
 LOCAL_C_INCLUDES:=\
 	$(LOCAL_PATH)/../lib \
@@ -35,7 +37,9 @@ LOCAL_SRC_FILES:= \
 	sdptool.c
 
 LOCAL_CFLAGS:= \
-	-DVERSION=\"4.93\" -fpermissive
+	-DVERSION=\"4.93\" \
+	-Wno-missing-field-initializers \
+	-Wno-pointer-arith
 
 LOCAL_C_INCLUDES:=\
 	$(LOCAL_PATH)/../lib \
@@ -61,7 +65,9 @@ LOCAL_SRC_FILES:= \
 
 LOCAL_CFLAGS:= \
 	-DSTORAGEDIR=\"/tmp\" \
-	-DVERSION=\"4.93\"
+	-DVERSION=\"4.93\" \
+	-Wno-missing-field-initializers \
+	-Wno-pointer-arith
 
 LOCAL_C_INCLUDES:=\
 	$(LOCAL_PATH)/../lib \
@@ -87,7 +93,9 @@ LOCAL_SRC_FILES:= \
 
 LOCAL_CFLAGS:= \
 	-DSTORAGEDIR=\"/tmp\" \
-	-DVERSION=\"4.93\"
+	-DVERSION=\"4.93\" \
+	-Wno-missing-field-initializers \
+	-Wno-pointer-arith
 
 LOCAL_C_INCLUDES:=\
 	$(LOCAL_PATH)/../lib \
@@ -142,7 +150,9 @@ LOCAL_CFLAGS:= \
 	-DVERSION=\"4.93\" \
 	-D__BSD_VISIBLE=1 \
 	-DCONFIGDIR=\"/etc/bluetooth\" \
-        -DNEED_PPOLL
+        -DNEED_PPOLL \
+	-Wno-missing-field-initializers \
+	-Wno-pointer-arith
 
 LOCAL_C_INCLUDES:=\
 	$(LOCAL_PATH)/../lib \
@@ -170,7 +180,9 @@ LOCAL_SRC_FILES:= \
 LOCAL_CFLAGS:= \
         -DVERSION=\"4.93\" \
 	-DCONFIGDIR=\"/etc/bluetooth\" \
-        -DNEED_PPOLL
+        -DNEED_PPOLL \
+	-Wno-missing-field-initializers \
+	-Wno-pointer-arith
 
 LOCAL_C_INCLUDES:= \
         $(LOCAL_PATH)/../src \

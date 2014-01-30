@@ -2911,3 +2911,82 @@ int hci_le_conn_update(int dd, uint16_t handle, uint16_t min_interval,
 
 	return 0;
 }
+
+int hci_vs_ext_flow_spec(int dd, uint16_t handle, uint16_t service_interval,
+		uint16_t out_service_window, uint16_t in_service_window,
+		uint8_t cqae, uint16_t packet_size, uint8_t *rsp_status, int to)
+{
+	vs_ext_flow_spec_cp cp;
+	vs_ext_flow_spec_rp rp;
+	struct hci_request rq;
+
+	memset(&cp, 0, sizeof(cp));
+	cp.handle = handle;
+	cp.service_interval = service_interval;
+	cp.out_service_window = out_service_window;
+	cp.in_service_window = in_service_window;
+	cp.cqae = cqae;
+	cp.packet_size = packet_size;
+
+	memset(&rq, 0, sizeof(rq));
+	rq.ogf    = OGF_VENDOR_CMD;
+	rq.ocf    = OCF_VS_EXT_FLOW_SPEC;
+	rq.cparam = &cp;
+	rq.clen   = VS_EXT_FLOW_SPEC_CP_SIZE;
+	rq.rparam = &rp;
+	rq.rlen   = VS_EXT_FLOW_SPEC_RP_SIZE;
+
+	if (hci_send_req(dd, &rq, to) < 0)
+		return -1;
+
+	if (rsp_status)
+		*rsp_status = rp.status;
+	if (rp.status) {
+		errno = EIO;
+		return -1;
+	}
+
+	return 0;
+}
+
+int hci_write_flow_spec(int dd, uint16_t handle, uint16_t token_bucket_size,
+		uint16_t access_latency, uint8_t direction,
+		uint8_t service_type, uint8_t flags, uint16_t token_rate,
+		uint16_t peak_bandwidth, uint8_t *rsp_status, int to)
+{
+	flow_spec_cp cp;
+	evt_flow_spec_complete rp;
+	struct hci_request rq;
+
+	memset(&cp, 0, sizeof(cp));
+	cp.handle = handle;
+	cp.flags = flags;
+	cp.spec.direction = direction;
+	cp.spec.service_type = service_type;
+	cp.spec.access_latency = access_latency;
+	cp.spec.token_bucket_size = token_bucket_size;
+	cp.spec.token_rate = token_rate;
+	cp.spec.peak_bandwidth = peak_bandwidth;
+
+	memset(&rq, 0, sizeof(rq));
+	rq.ogf    = OGF_LINK_POLICY;
+	rq.ocf    = OCF_FLOW_SPECIFICATION;
+	rq.event = EVT_FLOW_SPEC_COMPLETE;
+	rq.cparam = &cp;
+	rq.clen   = FLOW_SPEC_CP_SIZE;
+	rq.rparam = &rp;
+	rq.rlen   = EVT_FLOW_SPEC_COMPLETE_SIZE;
+
+	if (hci_send_req(dd, &rq, to) < 0)
+		return -1;
+
+	if (rsp_status)
+		*rsp_status = rp.status;
+	if (rp.status) {
+		errno = EIO;
+		return -1;
+	}
+
+	return 0;
+}
+

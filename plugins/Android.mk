@@ -8,13 +8,14 @@ include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:= \
 	hciops.c \
-	mgmtops.c \
 	dbusoob.c \
 
 LOCAL_CFLAGS:= \
 	-DVERSION=\"4.93\" \
 	-DBLUETOOTH_PLUGIN_BUILTIN \
-	-DSTORAGEDIR=\"/data/misc/bluetoothd\"
+	-DSTORAGEDIR=\"/data/misc/bluetoothd\" \
+	-Wno-missing-field-initializers \
+	-Wno-pointer-arith
 
 LOCAL_C_INCLUDES:= \
 	$(LOCAL_PATH)/../btio \

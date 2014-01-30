@@ -1287,6 +1287,20 @@ static void mgmt_local_name_changed(int sk, uint16_t index, void *buf, size_t le
 		adapter_update_local_name(adapter, (char *) ev->name);
 }
 
+static inline addr_type_t mgmt_addr_type(uint8_t mgmt_addr_type)
+{
+	switch (mgmt_addr_type) {
+	case MGMT_ADDR_BREDR:
+		return ADDR_TYPE_BREDR;
+	case MGMT_ADDR_LE_PUBLIC:
+		return ADDR_TYPE_LE_PUBLIC;
+	case MGMT_ADDR_LE_RANDOM:
+		return ADDR_TYPE_LE_RANDOM;
+	default:
+		return ADDR_TYPE_BREDR;
+	}
+}
+
 static void mgmt_device_found(int sk, uint16_t index, void *buf, size_t len)
 {
 	struct mgmt_ev_device_found *ev = buf;
@@ -1319,7 +1333,10 @@ static void mgmt_device_found(int sk, uint16_t index, void *buf, size_t len)
 	DBG("hci%u addr %s, class %u rssi %d %s", index, addr, cls,
 						ev->rssi, eir ? "eir" : "");
 
-	btd_event_device_found(&info->bdaddr, &ev->bdaddr, cls, ev->rssi, eir);
+	btd_event_device_found(&info->bdaddr, &ev->addr.bdaddr,
+					mgmt_addr_type(ev->addr.type), cls,
+					ev->rssi, ev->confirm_name,
+					eir, HCI_MAX_EIR_LENGTH);
 }
 
 static void mgmt_remote_name(int sk, uint16_t index, void *buf, size_t len)

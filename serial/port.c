@@ -48,7 +48,9 @@
 #include "../src/dbus-common.h"
 
 #include "log.h"
+#include "glib-compat.h"
 #include "glib-helper.h"
+#include "sdp-client.h"
 #include "btio.h"
 
 #include "error.h"

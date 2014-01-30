@@ -37,6 +37,7 @@ int bnep_kill_connection(bdaddr_t *dst);
 int bnep_kill_all_connections(void);
 
 int bnep_connadd(int sk, uint16_t role, char *dev);
+int bnep_extensionreq(bdaddr_t *dst, uint16_t len, uint8_t *data);
 int bnep_if_up(const char *devname);
 int bnep_if_down(const char *devname);
 int bnep_add_to_bridge(const char *devname, const char *bridge);

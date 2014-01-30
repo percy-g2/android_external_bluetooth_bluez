@@ -187,6 +187,31 @@ int bnep_connadd(int sk, uint16_t role, char *dev)
 	return 0;
 }
 
+int bnep_extensionreq(bdaddr_t *dst, uint16_t len, uint8_t *data)
+{
+	struct bnep_extension_req *req;
+	int err = 0;
+
+	req = malloc(sizeof(*req) + len);
+	if (!req) {
+		error("Could not allocate bnep_extension_req");
+		return -ENOMEM;
+	}
+	memset(req, 0, sizeof(*req) + len);
+	memcpy(req->ext_data, data, len);
+	req->data_len = len;
+	baswap((bdaddr_t *)req->dst, dst);
+	if (ioctl(ctl, BNEPEXTENSION, req) < 0) {
+		error("Failed to forward extension: %s(%d)",
+				strerror(errno), errno);
+		err = -errno;
+	}
+
+	free(req);
+
+	return err;
+}
+
 int bnep_if_up(const char *devname)
 {
 	struct ifreq ifr;

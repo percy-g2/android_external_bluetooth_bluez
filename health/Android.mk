@@ -16,6 +16,8 @@ LOCAL_CFLAGS:= \
 	-DVERSION=\"4.93\" \
 	-DSTORAGEDIR=\"/data/misc/bluetoothd\" \
 	-DCONFIGDIR=\"/etc/bluetooth\" \
+	-DDEBUG_SECTION=\"_health\" \
+	-Wno-missing-field-initializers
 
 LOCAL_C_INCLUDES:= \
 	$(LOCAL_PATH)/../btio \

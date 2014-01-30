@@ -16,6 +16,6 @@ LOCAL_SHARED_LIBRARIES := \
 
 LOCAL_MODULE:=libbluetooth
 
-LOCAL_CFLAGS+=-O3
+LOCAL_CFLAGS += -O3 -Wno-missing-field-initializers -Wno-pointer-arith
 
 include $(BUILD_SHARED_LIBRARY)

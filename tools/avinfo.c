@@ -457,7 +457,7 @@ static ssize_t avdtp_send(int sk, void *data, int len)
 		ret = -EIO;
 
 	if (ret < 0) {
-		printf("Unable to send message: %s (%zd)\n",
+		printf("Unable to send message: %s (%ld)\n",
 						strerror(-ret), -ret);
 		return ret;
 	}

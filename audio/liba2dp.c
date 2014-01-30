@@ -149,6 +149,13 @@ struct bluetooth_data {
 
 	/* used for pacing our writes to the output socket */
 	uint64_t	next_write;
+
+#ifdef SUPPORT_A2DP_1_3
+	/* Delay reporting data */
+	uint16_t	sink_delay;	/* Remote device delay in 1/10 milliseconds */
+	void		*user_data;	/* Arbitrary data set by delay report receiver */
+	report_sink_delay	dc_cb;		/* Callback function to report changed sink delay */
+#endif
 };
 
 static uint64_t get_microseconds()
@@ -503,6 +510,9 @@ static int bluetooth_a2dp_hw_params(struct bluetooth_data *data)
 	struct bt_open_rsp *open_rsp = (void *) buf;
 	struct bt_set_configuration_req *setconf_req = (void*) buf;
 	struct bt_set_configuration_rsp *setconf_rsp = (void*) buf;
+#ifdef SUPPORT_A2DP_1_3
+	struct bt_delay_report_ind *ind_delay = (void *) buf;
+#endif
 	int err;
 
 	memset(open_req, 0, BT_SUGGESTED_BUFFER_SIZE);
@@ -625,6 +635,23 @@ static int bluetooth_a2dp_hw_params(struct bluetooth_data *data)
 
 	data->link_mtu = setconf_rsp->link_mtu;
 	DBG("MTU: %d", data->link_mtu);
+
+#ifdef SUPPORT_A2DP_1_3
+	/* Retrieve sink delay */
+	ind_delay->h.length = sizeof(*ind_delay);
+	err = audioservice_expect(data, &ind_delay->h, BT_DELAY_REPORT);
+	if (!err) {
+		/*
+		 * A2DP 1.3 might not be supported by remote side so don't fail
+		 * A2DP setup because of failed DelayReport.
+		 */
+		DBG("Sink delay old %d, new %d",
+				(int) data->sink_delay, (int) ind_delay->delay);
+		if (data->dc_cb && ind_delay->delay != data->sink_delay)
+			data->dc_cb(data->user_data, ind_delay->delay);
+		data->sink_delay = ind_delay->delay;
+	}
+#endif
 
 	/* Setup SBC encoder now we agree on parameters */
 	bluetooth_a2dp_setup(data);
@@ -1105,7 +1132,11 @@ done:
 	return NULL;
 }
 
-int a2dp_init(int rate, int channels, a2dpData* dataPtr)
+int a2dp_init(int rate, int channels, a2dpData* dataPtr
+#ifdef SUPPORT_A2DP_1_3
+		, report_sink_delay sink_delay_cb, void *user_data
+#endif
+		)
 {
 	struct bluetooth_data* data;
 	pthread_attr_t attr;
@@ -1122,6 +1153,10 @@ int a2dp_init(int rate, int channels, a2dpData* dataPtr)
 	data->stream.fd = -1;
 	data->state = A2DP_STATE_NONE;
 	data->command = A2DP_CMD_NONE;
+#ifdef SUPPORT_A2DP_1_3
+	data->dc_cb = sink_delay_cb;
+	data->user_data = user_data;
+#endif
 
 	strncpy(data->address, "00:00:00:00:00:00", 18);
 	data->rate = rate;

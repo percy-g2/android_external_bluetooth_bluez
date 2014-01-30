@@ -57,6 +57,8 @@
 #define BUF_WRITE_AVAILABILITY_TIMEOUT_MS 5000
 /* maximum number of attempts to wait for a write completion in out_standby_stream_locked() */
 #define MAX_WRITE_COMPLETION_ATTEMPTS 5
+/* Default A2DP sink delay. Will be used if remote device does not support A2DP 1.3 */
+#define DEFAULT_SINK_DELAY 200
 
 /* NOTE: there are 2 mutexes used by the a2dp output stream.
  *  - lock: protects all calls to a2dp lib functions (a2dp_stop(), a2dp_cleanup()...).
@@ -123,6 +125,8 @@ struct astream_out {
     bool write_busy;            /* indicates that a write to a2dp sink is in progress and that
                                    standby must wait for this flag to be cleared by write thread */
     pthread_cond_t write_cond;  /* condition associated with write_busy flag */
+
+    int sink_delay;             /* Sink delay in ms */
 };
 
 static uint64_t system_time(void)
@@ -184,7 +188,7 @@ static uint32_t out_get_latency(const struct audio_stream_out *stream)
 {
     const struct astream_out *out = (const struct astream_out *)stream;
 
-    return ((out->buffer_duration_us * BUF_NUM_PERIODS) / 1000) + 200;
+    return ((out->buffer_duration_us * BUF_NUM_PERIODS) / 1000) + out->sink_delay;
 }
 
 static int out_set_volume(struct audio_stream_out *stream, float left,
@@ -199,6 +203,17 @@ static int out_get_render_position(const struct audio_stream_out *stream,
     return -ENOSYS;
 }
 
+#ifdef SUPPORT_A2DP_1_3
+static void a2dp_sink_delay_changed(void *user_data, unsigned int delay)
+{
+    struct astream_out *out = user_data;
+
+    out->sink_delay = delay / 10;
+    ALOGD("a2dp_sink_delay_changed delay %d ms. New total delay %u ms", out->sink_delay,
+          ((out->buffer_duration_us * BUF_NUM_PERIODS) / 1000) + out->sink_delay);
+}
+#endif
+
 static int _out_init_locked(struct astream_out *out, const char *addr)
 {
     int ret;
@@ -207,7 +222,11 @@ static int _out_init_locked(struct astream_out *out, const char *addr)
         return 0;
 
     /* XXX: shouldn't this use the sample_rate/channel_count from 'out'? */
-    ret = a2dp_init(44100, 2, &out->data);
+    ret = a2dp_init(44100, 2, &out->data
+#ifdef SUPPORT_A2DP_1_3
+                    , &a2dp_sink_delay_changed, out
+#endif
+                    );
     if (ret < 0) {
         ALOGE("a2dp_init failed err: %d\n", ret);
         out->data = NULL;
@@ -664,6 +683,8 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     out->device = devices;
     out->bt_enabled = adev->bt_enabled;
     out->suspended = adev->suspended;
+
+    out->sink_delay = DEFAULT_SINK_DELAY;
 
     /* for now, buffer_duration_us is precalculated and never changed.
      * if the sample rate or the format ever changes on the fly, we'd have

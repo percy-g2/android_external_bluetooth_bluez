@@ -16,6 +16,8 @@ LOCAL_CFLAGS:= \
 	-DSTORAGEDIR=\"/data/misc/bluetoothd\" \
 	-DCONFIGDIR=\"/etc/bluetooth\" \
 	-DANDROID_NO_BRIDGE \
+	-DDEBUG_SECTION=\"_network\" \
+	-Wno-missing-field-initializers
 
 LOCAL_C_INCLUDES:= \
 	$(LOCAL_PATH)/../btio \

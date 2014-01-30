@@ -125,6 +125,8 @@ builtin_sources += audio/main.c \
 			audio/gateway.h audio/gateway.c \
 			audio/headset.h audio/headset.c \
 			audio/control.h audio/control.c \
+			audio/avctp.h audio/avctp.c \
+			audio/avrcp.h audio/avrcp.c \
 			audio/device.h audio/device.c \
 			audio/source.h audio/source.c \
 			audio/sink.h audio/sink.c \
@@ -155,7 +157,7 @@ builtin_nodist += sap/sap.c
 
 noinst_LIBRARIES = sap/libsap.a
 
-sap_libsap_a_SOURCES = sap/sap.h sap/sap-dummy.c
+sap_libsap_a_SOURCES = sap/sap.h sap/sap-dummy.c sap/sap-u8500.c
 endif
 
 if INPUTPLUGIN
@@ -239,7 +241,8 @@ src_bluetoothd_SOURCES = $(gdbus_sources) $(builtin_sources) \
 			src/sdpd-service.c src/sdpd-database.c \
 			src/attrib-server.h src/attrib-server.c \
 			src/sdp-xml.h src/sdp-xml.c \
-			src/textfile.h src/textfile.c \
+			src/sdp-client.h src/sdp-client.c \
+			src/textfile.h src/textfile.c src/glib-compat.h \
 			src/glib-helper.h src/glib-helper.c \
 			src/oui.h src/oui.c src/uinput.h src/ppoll.h \
 			src/plugin.h src/plugin.c \
@@ -276,7 +279,7 @@ EXTRA_DIST += src/genbuiltin src/bluetooth.conf \
 			input/input.conf serial/serial.conf \
 			audio/audio.conf audio/telephony-dummy.c \
 			audio/telephony-maemo5.c audio/telephony-ofono.c \
-			audio/telephony-maemo6.c sap/sap-dummy.c
+			audio/telephony-maemo6.c sap/sap-dummy.c sap/sap-u8500.c
 
 
 if ALSA
